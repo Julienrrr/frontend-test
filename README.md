@@ -30,7 +30,7 @@ The initial product includes account creation and sign-in, session and role cont
 
 ## Technology
 
-- **Frontend:** React Router 7, React 19, TypeScript, React Aria Components, and TanStack Query.
+- **Frontend:** React Router 8, React 19, TypeScript, React Aria Components, and TanStack Query.
 - **Backend:** Java 25 and Spring Boot 4, with a versioned JSON:API HTTP interface.
 - **Database:** SQLite, initialized and updated by Flyway migrations.
 - **API documentation:** OpenAPI 3.1, served through Swagger UI.
@@ -122,6 +122,7 @@ npm run storybook
 Run frontend browser end-to-end tests with:
 
 ```sh
+npx playwright install chromium
 npm run test:e2e --workspace frontend
 ```
 
