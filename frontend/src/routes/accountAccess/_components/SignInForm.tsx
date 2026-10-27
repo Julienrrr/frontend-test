@@ -11,6 +11,7 @@ import {
 import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 
+import { requestErrorMessage } from '../../../_utils/requestErrorMessages'
 import { ApiError, fieldErrorsFrom } from '../../../api/apiErrors'
 import { createApplicantSession } from '../../../api/applicantAccess'
 import { useFieldErrors, type FieldErrors } from '../_hooks/useFieldErrors'
@@ -20,7 +21,6 @@ import {
   validateSignIn,
   type SignInValues,
 } from '../_utils/credentialRules'
-import { requestErrorMessage } from '../_utils/requestErrorMessages'
 
 import styles from './accountAccess.module.css'
 

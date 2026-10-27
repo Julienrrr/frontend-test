@@ -4,7 +4,7 @@ import {
   ApiError,
   NetworkError,
   UnexpectedResponseError,
-} from '../../../api/apiErrors'
+} from '../api/apiErrors'
 
 import { requestErrorMessage } from './requestErrorMessages'
 
