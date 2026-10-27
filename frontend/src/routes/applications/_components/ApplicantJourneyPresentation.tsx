@@ -1,4 +1,12 @@
-import { Box, Button, Card, CardContent, Stack, Typography } from '@kyc/ui'
+import {
+  Alert,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Stack,
+  Typography,
+} from '@kyc/ui'
 
 import styles from './applicantJourney.module.css'
 
@@ -21,6 +29,8 @@ export interface ApplicantJourneyPresentationFixture {
 
 export interface ApplicantJourneyPresentationProps extends ApplicantJourneyPresentationFixture {
   onPrimaryAction: () => void
+  isPending?: boolean
+  errorMessage?: string
 }
 
 export const applicantJourneyFixtures = {
@@ -73,6 +83,8 @@ export function ApplicantJourneyPresentation({
   entryState,
   progress,
   onPrimaryAction,
+  isPending = false,
+  errorMessage,
 }: ApplicantJourneyPresentationProps) {
   const stateCopy = copy[entryState]
 
@@ -132,10 +144,14 @@ export function ApplicantJourneyPresentation({
               </Stack>
             </Box>
 
+            {errorMessage ? (
+              <Alert severity="error">{errorMessage}</Alert>
+            ) : null}
             <Button
               aria-describedby="journey-description journey-progress"
               fullWidth
-              onClick={onPrimaryAction}
+              isPending={isPending}
+              onPress={onPrimaryAction}
               size="large"
               className={styles.action}
             >
