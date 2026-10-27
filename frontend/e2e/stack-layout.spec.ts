@@ -18,9 +18,8 @@ test('application form lays out actions without forwarding style props to the DO
   await signUpAndSignIn(page)
   await startApplication(page)
 
-  const actions = page
-    .getByRole('button', { name: 'Continue' })
-    .locator('xpath=..')
+  // Back sits directly in the actions row; Save and Continue are grouped on the other side.
+  const actions = page.getByRole('button', { name: 'Back' }).locator('xpath=..')
   await expect(actions).toHaveCSS('justify-content', 'space-between')
   expect(reactWarnings).toEqual([])
 })

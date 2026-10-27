@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { axe, toHaveNoViolations } from 'jest-axe'
 import { http, HttpResponse } from 'msw'
@@ -60,7 +61,14 @@ function renderStep(path: string) {
     },
     { path: '/sign-in', Component: () => <h1>Sign in page</h1> },
   ])
-  return render(<Stub initialEntries={[path]} />)
+  const queryClient = new QueryClient({
+    defaultOptions: { mutations: { retry: false } },
+  })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <Stub initialEntries={[path]} />
+    </QueryClientProvider>,
+  )
 }
 
 describe('application step page', () => {

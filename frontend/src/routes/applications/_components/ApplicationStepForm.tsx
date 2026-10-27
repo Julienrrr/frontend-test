@@ -1,6 +1,13 @@
-import { Box, Button, Stack, TextField, Typography } from '@kyc/ui'
+import { Alert, Box, Button, Stack, TextField, Typography } from '@kyc/ui'
+import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 
+import {
+  updateApplicantApplicationForm,
+  type AnswerField,
+  type ApplicationForm,
+  type ApplicationStep,
+} from '../../../api/applicantApplications'
 import {
   applicationStepFields,
   applicationStepTitles,
@@ -8,19 +15,17 @@ import {
 } from '../_utils/applicationFormFields'
 
 import styles from './applicationStep.module.css'
-
-import type {
-  AnswerField,
-  ApplicationForm,
-  ApplicationStep,
-} from '../../../api/applicantApplications'
+import { SaveErrorAlert } from './SaveErrorAlert'
 
 export interface ApplicationStepFormProps {
   /** Saved form state from the API; the form starts from it, never from browser storage. */
   form: ApplicationForm
   step: ApplicationStep
   onBack: () => void
+  /** Called once the step's answers are saved. */
   onContinue: () => void
+  /** Loads the latest saved form again, replacing the entered answers. */
+  onReload: () => void
 }
 
 export function ApplicationStepForm({
@@ -28,16 +33,52 @@ export function ApplicationStepForm({
   step,
   onBack,
   onContinue,
+  onReload,
 }: ApplicationStepFormProps) {
   const [answers, setAnswers] = useState(() => stepAnswers(step, form.answers))
   const [consentConfirmed, setConsentConfirmed] = useState(
     form.consentConfirmed,
   )
+  const [version, setVersion] = useState(form.version)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [saveIntent, setSaveIntent] = useState<'save' | 'continue'>('save')
   const isFirstStep = step === 'personal-details'
+
+  const save = useMutation({
+    mutationFn: () =>
+      updateApplicantApplicationForm(form.applicationId, {
+        step,
+        answers,
+        consentConfirmed: isFirstStep ? consentConfirmed : undefined,
+        version,
+      }),
+    onSuccess: (saved) => {
+      // Show what the API persisted (it trims values, for example), not the local copy.
+      setAnswers(stepAnswers(step, saved.answers))
+      setConsentConfirmed(saved.consentConfirmed)
+      setVersion(saved.version)
+      setHasUnsavedChanges(false)
+    },
+  })
 
   function updateAnswer(field: AnswerField, value: string) {
     setAnswers((current) => ({ ...current, [field]: value }))
+    setHasUnsavedChanges(true)
   }
+
+  function saveAnswers(intent: 'save' | 'continue') {
+    if (save.isPending) {
+      return
+    }
+    setSaveIntent(intent)
+    save.mutate(undefined, {
+      onSuccess: intent === 'continue' ? onContinue : undefined,
+    })
+  }
+
+  const isSaved = save.isSuccess && !hasUnsavedChanges
+  const isSaving = save.isPending && saveIntent === 'save'
+  const isContinuing = save.isPending && saveIntent === 'continue'
 
   return (
     <main className={styles.page}>
@@ -57,7 +98,7 @@ export function ApplicationStepForm({
             className={styles.stepForm}
             onSubmit={(event) => {
               event.preventDefault()
-              onContinue()
+              saveAnswers('continue')
             }}
             spacing={2}
           >
@@ -71,6 +112,8 @@ export function ApplicationStepForm({
                 onChange={(event) =>
                   updateAnswer(field.name, event.target.value)
                 }
+                // Read-only rather than disabled while saving, so focus stays where it is.
+                readOnly={save.isPending}
                 required
                 value={answers[field.name] ?? ''}
               />
@@ -80,9 +123,12 @@ export function ApplicationStepForm({
                 <input
                   checked={consentConfirmed}
                   name="consentConfirmed"
-                  onChange={(event) =>
-                    setConsentConfirmed(event.target.checked)
-                  }
+                  onChange={(event) => {
+                    if (!save.isPending) {
+                      setConsentConfirmed(event.target.checked)
+                      setHasUnsavedChanges(true)
+                    }
+                  }}
                   required
                   type="checkbox"
                 />{' '}
@@ -107,6 +153,12 @@ export function ApplicationStepForm({
                 </Typography>
               </>
             )}
+            {save.error ? (
+              <SaveErrorAlert error={save.error} onReload={onReload} />
+            ) : null}
+            {isSaved ? (
+              <Alert severity="success">Your answers were saved.</Alert>
+            ) : null}
             <Stack
               component="div"
               className={styles.formActions}
@@ -116,9 +168,19 @@ export function ApplicationStepForm({
               <Button type="button" variant="quiet" onPress={onBack}>
                 Back
               </Button>
-              <Button type="submit">
-                {isFirstStep ? 'Continue' : 'Save and review'}
-              </Button>
+              <Stack component="div" direction="row" spacing={2}>
+                <Button
+                  isPending={isSaving}
+                  onPress={() => saveAnswers('save')}
+                  type="button"
+                  variant="secondary"
+                >
+                  {isSaving ? 'Saving…' : 'Save'}
+                </Button>
+                <Button isPending={isContinuing} type="submit">
+                  {isFirstStep ? 'Continue' : 'Save and review'}
+                </Button>
+              </Stack>
             </Stack>
           </Stack>
         </Stack>

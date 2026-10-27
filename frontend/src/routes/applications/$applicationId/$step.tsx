@@ -11,6 +11,7 @@ import {
   data,
   isRouteErrorResponse,
   useNavigate,
+  useRevalidator,
   useRouteError,
 } from 'react-router'
 import { z } from 'zod'
@@ -66,6 +67,7 @@ export default function CurrentApplicationStepPage({
   loaderData,
 }: Route.ComponentProps) {
   const navigate = useNavigate()
+  const revalidator = useRevalidator()
   const applicationPath = `/applications/${params.applicationId}`
 
   if (!isApplicationStep(params.step)) {
@@ -93,6 +95,7 @@ export default function CurrentApplicationStepPage({
             : `${applicationPath}/personal-details`,
         )
       }
+      onReload={() => void revalidator.revalidate()}
       onContinue={() =>
         void navigate(
           step === 'personal-details'
