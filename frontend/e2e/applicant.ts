@@ -22,3 +22,10 @@ export async function signUpAndSignIn(page: Page): Promise<string> {
 
   return email
 }
+
+/** Starts the signed-in Applicant's draft from the journey page and opens its first step. */
+export async function startApplication(page: Page): Promise<void> {
+  await page.goto('/applications/current')
+  await page.getByRole('button', { name: 'Start application' }).click()
+  await expect(page).toHaveURL(/\/applications\/[^/]+\/personal-details$/)
+}

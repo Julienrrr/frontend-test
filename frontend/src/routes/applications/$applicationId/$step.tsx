@@ -1,184 +1,155 @@
 import {
   Alert,
-  Box,
   Button,
   Card,
   CardContent,
+  Link,
   Stack,
-  TextField,
   Typography,
 } from '@kyc/ui'
-import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import {
+  data,
+  isRouteErrorResponse,
+  useNavigate,
+  useRouteError,
+} from 'react-router'
+import { z } from 'zod'
 
+import { ApiError } from '../../../api/apiErrors'
+import {
+  getApplicantApplicationForm,
+  type ApplicationStep,
+} from '../../../api/applicantApplications'
 import styles from '../_components/applicationStep.module.css'
+import { ApplicationStepForm } from '../_components/ApplicationStepForm'
+import { withApplicantSession } from '../_utils/withApplicantSession'
 
 import type { Route } from './+types/$step'
 
-const fields = {
-  'personal-details': [
-    'Name',
-    'Date of birth',
-    'Country',
-    'Nationality',
-    'Email',
-    'Phone',
-  ],
-  'identity-and-address': [
-    'Document type',
-    'Document number',
-    'Document country',
-    'Expiry',
-    'Street',
-    'City',
-    'Postal code',
-    'Residential country',
-  ],
-} as const
+const formSteps: readonly string[] = [
+  'personal-details',
+  'identity-and-address',
+] satisfies ApplicationStep[]
+
+function isApplicationStep(step: string): step is ApplicationStep {
+  return formSteps.includes(step)
+}
+
+// The contract identifies applications by UUID; anything else cannot exist.
+const applicationIdSchema = z.guid()
+
+export async function clientLoader({
+  params,
+  request,
+}: Route.ClientLoaderArgs) {
+  if (
+    !applicationIdSchema.safeParse(params.applicationId).success ||
+    (params.step !== 'review' && !isApplicationStep(params.step))
+  ) {
+    throw data(null, { status: 404 })
+  }
+  try {
+    const form = await withApplicantSession(() =>
+      getApplicantApplicationForm(params.applicationId, request.signal),
+    )
+    return { form }
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      throw data(null, { status: 404 })
+    }
+    throw error
+  }
+}
 
 export default function CurrentApplicationStepPage({
   params,
+  loaderData,
 }: Route.ComponentProps) {
   const navigate = useNavigate()
-  const step =
-    params.step === 'identity-and-address'
-      ? 'identity-and-address'
-      : 'personal-details'
-  const [missing, setMissing] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const advance = () => {
-    const form = document.querySelector('form')
-    if (form && !form.reportValidity()) return
-    setMissing(false)
-    setSaved(true)
-    if (step === 'personal-details')
-      void navigate(
-        `/applications/${params.applicationId}/identity-and-address`,
-      )
-    else void navigate(`/applications/${params.applicationId}/review`)
-  }
+  const applicationPath = `/applications/${params.applicationId}`
 
-  if (params.step === 'review') {
+  if (!isApplicationStep(params.step)) {
     return (
-      <main className={styles.reviewPage}>
-        <Card className={styles.reviewCard}>
-          <CardContent>
-            <Stack spacing={2}>
-              <Typography component="h1" variant="heading">
-                Review application
-              </Typography>
-              <Typography>Your application is ready for review.</Typography>
-              <label>
-                <input type="checkbox" /> I confirm the information is complete
-                and accurate.
-              </label>
-              <Button
-                onClick={() =>
-                  void navigate(
-                    `/applications/${params.applicationId}/submitted`,
-                  )
-                }
-              >
-                Submit
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() =>
-                  void navigate(
-                    `/applications/${params.applicationId}/identity-and-address`,
-                  )
-                }
-              >
-                Return to form
-              </Button>
-            </Stack>
-          </CardContent>
-        </Card>
-      </main>
+      <ReviewPlaceholder
+        onSubmit={() => void navigate(`${applicationPath}/submitted`)}
+        onReturn={() =>
+          void navigate(`${applicationPath}/identity-and-address`)
+        }
+      />
     )
   }
 
+  const step = params.step
   return (
-    <main className={styles.page}>
-      <Box component="div" className={styles.stepContent}>
-        <Stack spacing={3}>
-          <Typography component="p" variant="eyebrow" tone="accent">
-            STEP {step === 'personal-details' ? '1' : '2'} OF 2
-          </Typography>
+    <ApplicationStepForm
+      // A new step or a reloaded form starts from the saved answers again.
+      key={`${step}-${loaderData.form.version}`}
+      form={loaderData.form}
+      step={step}
+      onBack={() =>
+        void navigate(
+          step === 'personal-details'
+            ? '/applications/current'
+            : `${applicationPath}/personal-details`,
+        )
+      }
+      onContinue={() =>
+        void navigate(
+          step === 'personal-details'
+            ? `${applicationPath}/identity-and-address`
+            : `${applicationPath}/review`,
+        )
+      }
+    />
+  )
+}
+
+export function ErrorBoundary() {
+  const error = useRouteError()
+  if (isRouteErrorResponse(error) && error.status === 404) {
+    return (
+      <main className={styles.page}>
+        <Stack spacing={2}>
           <Typography component="h1" variant="heading">
-            {step === 'personal-details'
-              ? 'Personal details'
-              : 'Identity and address'}
+            Application not found
           </Typography>
-          <Typography tone="muted">
-            Complete this form as part of the frontend implementation exercise.
-          </Typography>
-          <Stack
-            component="form"
-            className={styles.stepForm}
-            onSubmit={(event) => {
-              event.preventDefault()
-              advance()
-            }}
-            spacing={2}
-          >
-            {fields[step].map((label) => (
-              <TextField key={label} label={`${label} (required)`} required />
-            ))}
-            {step === 'personal-details' ? (
-              <label>
-                <input required type="checkbox" /> I confirm these details are
-                accurate and belong to me.
-              </label>
-            ) : (
-              <>
-                <label htmlFor="document-evidence">
-                  Document evidence (required)
-                </label>
-                <input
-                  id="document-evidence"
-                  type="file"
-                  accept="image/jpeg,image/png"
-                  required
-                />
-              </>
-            )}
-            {missing ? (
-              <Alert role="alert" severity="error">
-                Complete all required fields before continuing.
-              </Alert>
-            ) : null}
-            {saved ? (
-              <Alert role="status" severity="success">
-                Your progress was saved in this prototype.
-              </Alert>
-            ) : null}
-            <Stack
-              component="div"
-              className={styles.formActions}
-              direction="row"
-              spacing={2}
-            >
-              <Button
-                type="button"
-                variant="quiet"
-                onClick={() =>
-                  step === 'personal-details'
-                    ? void navigate('/applications/current')
-                    : void navigate(
-                        `/applications/${params.applicationId}/personal-details`,
-                      )
-                }
-              >
-                Back
-              </Button>
-              <Button type="submit">
-                {step === 'personal-details' ? 'Continue' : 'Save and review'}
-              </Button>
-            </Stack>
-          </Stack>
+          <Alert severity="error">This application is not available.</Alert>
+          <Link href="/applications/current">Go to your application</Link>
         </Stack>
-      </Box>
+      </main>
+    )
+  }
+  throw error
+}
+
+// Final review and submission are outside the scope of the save-and-resume work.
+function ReviewPlaceholder({
+  onSubmit,
+  onReturn,
+}: {
+  onSubmit: () => void
+  onReturn: () => void
+}) {
+  return (
+    <main className={styles.reviewPage}>
+      <Card className={styles.reviewCard}>
+        <CardContent>
+          <Stack spacing={2}>
+            <Typography component="h1" variant="heading">
+              Review application
+            </Typography>
+            <Typography>Your application is ready for review.</Typography>
+            <label>
+              <input type="checkbox" /> I confirm the information is complete
+              and accurate.
+            </label>
+            <Button onClick={onSubmit}>Submit</Button>
+            <Button variant="secondary" onClick={onReturn}>
+              Return to form
+            </Button>
+          </Stack>
+        </CardContent>
+      </Card>
     </main>
   )
 }

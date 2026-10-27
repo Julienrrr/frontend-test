@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { signUpAndSignIn } from './applicant'
+import { signUpAndSignIn, startApplication } from './applicant'
 
 test('application form lays out actions without forwarding style props to the DOM', async ({
   page,
@@ -16,7 +16,7 @@ test('application form lays out actions without forwarding style props to the DO
   })
 
   await signUpAndSignIn(page)
-  await page.goto('/applications/prototype/personal-details')
+  await startApplication(page)
 
   const actions = page
     .getByRole('button', { name: 'Continue' })
