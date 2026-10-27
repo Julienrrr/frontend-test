@@ -1,9 +1,9 @@
 import { useNavigate } from 'react-router'
 
-import { parseAccountAccessSearch } from './-return-target'
-import { SignInForm } from './-sign-in-form'
+import { SignInForm } from './accountAccess/_components/SignInForm'
+import { parseAccountAccessSearch } from './accountAccess/_utils/returnTarget'
 
-import type { Route } from './+types/sign-in'
+import type { Route } from './+types/signIn'
 
 export function clientLoader({ request }: Route.ClientLoaderArgs) {
   const search = Object.fromEntries(new URL(request.url).searchParams)

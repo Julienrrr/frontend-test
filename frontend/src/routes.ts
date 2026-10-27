@@ -4,8 +4,8 @@ export default [
   index('routes/index.tsx'),
   route('api/docs', 'routes/api-docs-redirect.tsx'),
   route('api-docs', 'routes/api-docs.tsx'),
-  route('create-account', 'routes/create-account.tsx'),
-  route('sign-in', 'routes/sign-in.tsx'),
+  route('create-account', 'routes/createAccount.tsx'),
+  route('sign-in', 'routes/signIn.tsx'),
   route('applications', 'routes/applications.tsx', [
     route('current', 'routes/applications/current.tsx'),
     route(

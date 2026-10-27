@@ -1,9 +1,9 @@
 import { useNavigate } from 'react-router'
 
-import { CreateAccountForm } from './-create-account-form'
-import { parseAccountAccessSearch } from './-return-target'
+import { CreateAccountForm } from './accountAccess/_components/CreateAccountForm'
+import { parseAccountAccessSearch } from './accountAccess/_utils/returnTarget'
 
-import type { Route } from './+types/create-account'
+import type { Route } from './+types/createAccount'
 
 export function clientLoader({ request }: Route.ClientLoaderArgs) {
   const search = Object.fromEntries(new URL(request.url).searchParams)

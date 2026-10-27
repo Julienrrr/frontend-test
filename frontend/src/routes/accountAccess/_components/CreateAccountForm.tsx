@@ -10,8 +10,9 @@ import {
 } from '@kyc/ui'
 import { useEffect, useRef, useState } from 'react'
 
-import { accountAccessHref } from './-return-target'
-import styles from './account-access.module.css'
+import { accountAccessHref } from '../_utils/returnTarget'
+
+import styles from './accountAccess.module.css'
 
 export interface CreateAccountFormProps {
   onNavigate?: (href: string) => void
