@@ -8,8 +8,18 @@ import {
   TextField,
   Typography,
 } from '@kyc/ui'
+import { useMutation } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 
+import { ApiError, fieldErrorsFrom, NetworkError } from '../../../api/apiErrors'
+import { createApplicantAccount } from '../../../api/applicantAccess'
+import {
+  normalizeEmail,
+  validateRegistration,
+  type CredentialErrors,
+  type RegistrationValues,
+} from '../_utils/credentialRules'
 import { accountAccessHref } from '../_utils/returnTarget'
 
 import styles from './accountAccess.module.css'
@@ -19,6 +29,15 @@ export interface CreateAccountFormProps {
   returnTo?: string
 }
 
+type RegistrationField = keyof RegistrationValues
+type RegistrationErrors = CredentialErrors<RegistrationValues>
+
+const fieldOrder: readonly RegistrationField[] = [
+  'email',
+  'password',
+  'passwordConfirmation',
+]
+
 const passwordGuidance =
   'Use at least six characters, including one uppercase letter and one special character.'
 
@@ -26,38 +45,129 @@ export function CreateAccountForm({
   onNavigate,
   returnTo,
 }: CreateAccountFormProps) {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string>()
-  const [emailError, setEmailError] = useState<string>()
-  const [passwordError, setPasswordError] = useState<string>()
-  const [successMessage, setSuccessMessage] = useState<string>()
+  const [values, setValues] = useState<RegistrationValues>({
+    email: '',
+    password: '',
+    passwordConfirmation: '',
+  })
+  const [fieldErrors, setFieldErrors] = useState<RegistrationErrors>({})
+  const [retryLockSeconds, setRetryLockSeconds] = useState<number>()
   const emailInput = useRef<HTMLInputElement>(null)
   const passwordInput = useRef<HTMLInputElement>(null)
+  const passwordConfirmationInput = useRef<HTMLInputElement>(null)
+  const successHeading = useRef<HTMLElement>(null)
+
+  const registration = useMutation({
+    mutationFn: createApplicantAccount,
+    onError: (error) => {
+      const apiFieldErrors = registrationFieldErrors(error)
+      if (Object.keys(apiFieldErrors).length > 0) {
+        showFieldErrors(apiFieldErrors)
+      }
+      if (error instanceof ApiError && error.retryAfterSeconds) {
+        setRetryLockSeconds(error.retryAfterSeconds)
+      }
+    },
+  })
+
+  // Keeps the submit button disabled for the Retry-After delay, then clears the rate-limit message.
+  const { reset: resetRegistration } = registration
+  useEffect(() => {
+    if (retryLockSeconds === undefined) {
+      return undefined
+    }
+    const timer = setTimeout(() => {
+      setRetryLockSeconds(undefined)
+      resetRegistration()
+    }, retryLockSeconds * 1000)
+    return () => clearTimeout(timer)
+  }, [retryLockSeconds, resetRegistration])
 
   useEffect(() => {
-    if (emailError) {
-      emailInput.current?.focus()
-    } else if (passwordError) {
-      passwordInput.current?.focus()
+    if (registration.isSuccess) {
+      successHeading.current?.focus()
     }
-  }, [emailError, passwordError])
+  }, [registration.isSuccess])
 
-  async function submit(): Promise<void> {
-    setError(undefined)
-    setEmailError(undefined)
-    setPasswordError(undefined)
-    setSuccessMessage(undefined)
-
-    try {
-      setPassword('')
-      setSuccessMessage(
-        'Account form is ready. Sign-in is available for this prototype.',
-      )
-    } catch {
-      setError('Account form could not be completed.')
+  function showFieldErrors(errors: RegistrationErrors) {
+    // Render the messages before moving focus so the field is announced with its error.
+    flushSync(() => setFieldErrors(errors))
+    const firstInvalidField = fieldOrder.find((field) => errors[field])
+    if (firstInvalidField) {
+      inputFor(firstInvalidField).current?.focus()
     }
   }
+
+  function inputFor(field: RegistrationField) {
+    return {
+      email: emailInput,
+      password: passwordInput,
+      passwordConfirmation: passwordConfirmationInput,
+    }[field]
+  }
+
+  function updateField(field: RegistrationField, value: string) {
+    setValues((current) => ({ ...current, [field]: value }))
+    setFieldErrors((current) => ({ ...current, [field]: undefined }))
+  }
+
+  function submit() {
+    if (registration.isPending || retryLockSeconds !== undefined) {
+      return
+    }
+    const errors = validateRegistration(values)
+    if (Object.keys(errors).length > 0) {
+      showFieldErrors(errors)
+      return
+    }
+    setFieldErrors({})
+    registration.mutate({
+      email: normalizeEmail(values.email),
+      password: values.password,
+    })
+  }
+
+  const signInHref = accountAccessHref('/sign-in', returnTo)
+  const signInLink = (label: string) => (
+    <Link
+      href={signInHref}
+      onClick={(event) => {
+        if (onNavigate) {
+          event.preventDefault()
+          onNavigate(signInHref)
+        }
+      }}
+    >
+      {label}
+    </Link>
+  )
+
+  if (registration.isSuccess) {
+    return (
+      <main className={styles.page}>
+        <Card className={styles.card}>
+          <CardContent className={styles.cardContent}>
+            <Stack spacing={3}>
+              <Typography
+                component="h1"
+                variant="heading"
+                ref={successHeading}
+                tabIndex={-1}
+              >
+                Account created
+              </Typography>
+              <Typography>
+                You can now sign in with your email address and password.
+              </Typography>
+              {signInLink('Sign in')}
+            </Stack>
+          </CardContent>
+        </Card>
+      </main>
+    )
+  }
+
+  const formError = registrationFormError(registration.error)
 
   return (
     <main className={styles.page}>
@@ -68,7 +178,7 @@ export function CreateAccountForm({
             className={styles.form}
             onSubmit={(event) => {
               event.preventDefault()
-              void submit()
+              submit()
             }}
             spacing={3}
           >
@@ -80,56 +190,58 @@ export function CreateAccountForm({
                 Create credentials to begin your KYC application.
               </Typography>
             </Stack>
-            {(error ?? emailError ?? passwordError) ? (
-              <Alert aria-live="assertive" role="alert" severity="error">
-                {error ?? emailError ?? passwordError}
-              </Alert>
-            ) : null}
-            {successMessage ? (
-              <Alert aria-live="polite" role="status" severity="success">
-                {successMessage}
-              </Alert>
-            ) : null}
+            {formError ? <Alert severity="error">{formError}</Alert> : null}
             <TextField
               autoComplete="email"
-              errorMessage={emailError}
+              errorMessage={fieldErrors.email}
               fullWidth
               id="applicant-email"
               inputRef={emailInput}
               label="Email address"
               name="email"
-              onChange={(event) => {
-                setEmail(event.target.value)
-                setEmailError(undefined)
-              }}
+              onChange={(event) => updateField('email', event.target.value)}
               required
               type="email"
-              value={email}
+              value={values.email}
             />
             <TextField
               autoComplete="new-password"
-              errorMessage={passwordError}
+              errorMessage={fieldErrors.password}
               fullWidth
               helperText={passwordGuidance}
               id="applicant-password"
               inputRef={passwordInput}
               label="Password"
               name="password"
-              onChange={(event) => {
-                setPassword(event.target.value)
-                setPasswordError(undefined)
-              }}
+              onChange={(event) => updateField('password', event.target.value)}
               required
               type="password"
-              value={password}
+              value={values.password}
+            />
+            <TextField
+              autoComplete="new-password"
+              errorMessage={fieldErrors.passwordConfirmation}
+              fullWidth
+              id="applicant-password-confirmation"
+              inputRef={passwordConfirmationInput}
+              label="Confirm password"
+              name="passwordConfirmation"
+              onChange={(event) =>
+                updateField('passwordConfirmation', event.target.value)
+              }
+              required
+              type="password"
+              value={values.passwordConfirmation}
             />
             <Button
               className={styles.submit}
               fullWidth
+              isDisabled={retryLockSeconds !== undefined}
+              isPending={registration.isPending}
               size="large"
               type="submit"
             >
-              Create account
+              {registration.isPending ? 'Creating account…' : 'Create account'}
             </Button>
             <Typography
               className={styles.footer}
@@ -137,21 +249,51 @@ export function CreateAccountForm({
               variant="caption"
             >
               <span>Already have an account? </span>
-              <Link
-                href={accountAccessHref('/sign-in', returnTo)}
-                onClick={(event) => {
-                  if (onNavigate) {
-                    event.preventDefault()
-                    onNavigate(accountAccessHref('/sign-in', returnTo))
-                  }
-                }}
-              >
-                Sign in
-              </Link>
+              {signInLink('Sign in')}
             </Typography>
           </Stack>
         </CardContent>
       </Card>
     </main>
   )
+}
+
+/** API errors that belong next to a field rather than in the form-level alert. */
+function registrationFieldErrors(error: Error): RegistrationErrors {
+  if (!(error instanceof ApiError)) {
+    return {}
+  }
+  if (error.hasCode('email-already-registered')) {
+    return { email: 'An account already exists for this email address.' }
+  }
+  return error.status === 400 ? fieldErrorsFrom(error) : {}
+}
+
+function registrationFormError(error: Error | null): string | undefined {
+  if (!error) {
+    return undefined
+  }
+  if (Object.keys(registrationFieldErrors(error)).length > 0) {
+    return undefined
+  }
+  if (error instanceof ApiError && error.status === 429) {
+    return `Too many attempts. Try again in ${retryDelay(error.retryAfterSeconds)}.`
+  }
+  if (error instanceof NetworkError) {
+    return error.kind === 'timeout'
+      ? 'The server took too long to respond. Please try again.'
+      : "We couldn't reach the server. Check your connection and try again."
+  }
+  return 'Something went wrong. Please try again.'
+}
+
+function retryDelay(seconds: number | undefined): string {
+  if (!seconds) {
+    return 'a few minutes'
+  }
+  if (seconds < 60) {
+    return seconds === 1 ? '1 second' : `${seconds} seconds`
+  }
+  const minutes = Math.ceil(seconds / 60)
+  return minutes === 1 ? '1 minute' : `${minutes} minutes`
 }
