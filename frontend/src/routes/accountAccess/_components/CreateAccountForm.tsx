@@ -10,10 +10,10 @@ import {
 } from '@kyc/ui'
 import { useMutation } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { flushSync } from 'react-dom'
 
 import { ApiError, fieldErrorsFrom } from '../../../api/apiErrors'
 import { createApplicantAccount } from '../../../api/applicantAccess'
+import { useFieldErrors } from '../_hooks/useFieldErrors'
 import { useRetryAfterLock } from '../_hooks/useRetryAfterLock'
 import {
   normalizeEmail,
@@ -52,10 +52,13 @@ export function CreateAccountForm({
     password: '',
     passwordConfirmation: '',
   })
-  const [fieldErrors, setFieldErrors] = useState<RegistrationErrors>({})
-  const emailInput = useRef<HTMLInputElement>(null)
-  const passwordInput = useRef<HTMLInputElement>(null)
-  const passwordConfirmationInput = useRef<HTMLInputElement>(null)
+  const {
+    fieldErrors,
+    inputRef,
+    showFieldErrors,
+    clearFieldError,
+    clearFieldErrors,
+  } = useFieldErrors(fieldOrder)
   const successHeading = useRef<HTMLElement>(null)
 
   const registration = useMutation({
@@ -78,26 +81,9 @@ export function CreateAccountForm({
     }
   }, [registration.isSuccess])
 
-  function showFieldErrors(errors: RegistrationErrors) {
-    // Render the messages before moving focus so the field is announced with its error.
-    flushSync(() => setFieldErrors(errors))
-    const firstInvalidField = fieldOrder.find((field) => errors[field])
-    if (firstInvalidField) {
-      inputFor(firstInvalidField).current?.focus()
-    }
-  }
-
-  function inputFor(field: RegistrationField) {
-    return {
-      email: emailInput,
-      password: passwordInput,
-      passwordConfirmation: passwordConfirmationInput,
-    }[field]
-  }
-
   function updateField(field: RegistrationField, value: string) {
     setValues((current) => ({ ...current, [field]: value }))
-    setFieldErrors((current) => ({ ...current, [field]: undefined }))
+    clearFieldError(field)
   }
 
   function submit() {
@@ -109,7 +95,7 @@ export function CreateAccountForm({
       showFieldErrors(errors)
       return
     }
-    setFieldErrors({})
+    clearFieldErrors()
     registration.mutate({
       email: normalizeEmail(values.email),
       password: values.password,
@@ -185,7 +171,7 @@ export function CreateAccountForm({
               errorMessage={fieldErrors.email}
               fullWidth
               id="applicant-email"
-              inputRef={emailInput}
+              inputRef={inputRef('email')}
               label="Email address"
               name="email"
               onChange={(event) => updateField('email', event.target.value)}
@@ -199,7 +185,7 @@ export function CreateAccountForm({
               fullWidth
               helperText={passwordGuidance}
               id="applicant-password"
-              inputRef={passwordInput}
+              inputRef={inputRef('password')}
               label="Password"
               name="password"
               onChange={(event) => updateField('password', event.target.value)}
@@ -212,7 +198,7 @@ export function CreateAccountForm({
               errorMessage={fieldErrors.passwordConfirmation}
               fullWidth
               id="applicant-password-confirmation"
-              inputRef={passwordConfirmationInput}
+              inputRef={inputRef('passwordConfirmation')}
               label="Confirm password"
               name="passwordConfirmation"
               onChange={(event) =>
