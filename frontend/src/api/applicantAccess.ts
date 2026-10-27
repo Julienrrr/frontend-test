@@ -45,3 +45,10 @@ export async function createApplicantSession(
   })
   return { href: document.data.attributes.href }
 }
+
+/** Revokes the current session; the API clears the session cookie. */
+export async function deleteCurrentApplicantSession(): Promise<void> {
+  await requestJsonApi('/api/v1/applicant-sessions/current', {
+    method: 'DELETE',
+  })
+}

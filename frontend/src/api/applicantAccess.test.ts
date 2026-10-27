@@ -7,6 +7,7 @@ import { UnexpectedResponseError } from './apiErrors'
 import {
   createApplicantAccount,
   createApplicantSession,
+  deleteCurrentApplicantSession,
 } from './applicantAccess'
 
 const credentials = { email: 'ada@example.com', password: 'Secret!1' }
@@ -93,5 +94,18 @@ describe('createApplicantSession', () => {
     await expect(createApplicantSession(credentials)).rejects.toBeInstanceOf(
       UnexpectedResponseError,
     )
+  })
+})
+
+describe('deleteCurrentApplicantSession', () => {
+  it('revokes the current session', async () => {
+    server.use(
+      http.delete(
+        '/api/v1/applicant-sessions/current',
+        () => new HttpResponse(null, { status: 204 }),
+      ),
+    )
+
+    await expect(deleteCurrentApplicantSession()).resolves.toBeUndefined()
   })
 })
