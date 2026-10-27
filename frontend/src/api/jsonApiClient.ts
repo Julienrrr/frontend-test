@@ -61,6 +61,18 @@ export async function requestJsonApi<T>(
   return result.data
 }
 
+/** Same as `requestJsonApi`, for operations whose contract always returns a document on success. */
+export async function requestJsonApiDocument<T>(
+  path: string,
+  options: JsonApiRequestOptions<T> & { schema: z.ZodType<T> },
+): Promise<T> {
+  const document = await requestJsonApi(path, options)
+  if (document === undefined) {
+    throw new UnexpectedResponseError()
+  }
+  return document
+}
+
 async function send(path: string, init: RequestInit): Promise<Response> {
   try {
     return await fetch(path, init)

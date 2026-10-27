@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
-import { UnexpectedResponseError } from './apiErrors'
-import { requestJsonApi } from './jsonApiClient'
+import { sameOriginPathSchema } from './_utils/sameOriginPath'
+import { requestJsonApi, requestJsonApiDocument } from './jsonApiClient'
 
 export interface Credentials {
   email: string
@@ -27,19 +27,7 @@ const applicantSessionDocumentSchema = z.object({
   data: z.object({
     type: z.literal('applicant-sessions'),
     id: z.string(),
-    attributes: z.object({
-      href: z.string().transform((href, context) => {
-        const path = toSameOriginPath(href)
-        if (path === undefined) {
-          context.addIssue({
-            code: 'custom',
-            message: 'The journey href must stay on this site.',
-          })
-          return z.NEVER
-        }
-        return path
-      }),
-    }),
+    attributes: z.object({ href: sameOriginPathSchema }),
   }),
 })
 
@@ -50,25 +38,10 @@ const applicantSessionDocumentSchema = z.object({
 export async function createApplicantSession(
   credentials: Credentials,
 ): Promise<ApplicantSession> {
-  const document = await requestJsonApi('/api/v1/applicant-sessions', {
+  const document = await requestJsonApiDocument('/api/v1/applicant-sessions', {
     method: 'POST',
     body: { data: { type: 'applicant-sessions', attributes: credentials } },
     schema: applicantSessionDocumentSchema,
   })
-  if (!document) {
-    throw new UnexpectedResponseError()
-  }
   return { href: document.data.attributes.href }
-}
-
-// Parsing with the URL API catches tricks such as `/\evil.example`, which browsers treat as `//evil.example`.
-function toSameOriginPath(href: string): string | undefined {
-  try {
-    const url = new URL(href, window.location.origin)
-    return url.origin === window.location.origin
-      ? `${url.pathname}${url.search}${url.hash}`
-      : undefined
-  } catch {
-    return undefined
-  }
 }

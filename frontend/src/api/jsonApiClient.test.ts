@@ -5,7 +5,11 @@ import { z } from 'zod'
 import { server } from '../test/server'
 
 import { ApiError, NetworkError, UnexpectedResponseError } from './apiErrors'
-import { jsonApiMediaType, requestJsonApi } from './jsonApiClient'
+import {
+  jsonApiMediaType,
+  requestJsonApi,
+  requestJsonApiDocument,
+} from './jsonApiClient'
 
 const path = '/api/v1/examples'
 const exampleSchema = z.object({ data: z.object({ id: z.string() }) })
@@ -188,6 +192,16 @@ describe('requestJsonApi', () => {
 
     await expect(
       requestJsonApi(path, { schema: exampleSchema }),
+    ).rejects.toBeInstanceOf(UnexpectedResponseError)
+  })
+})
+
+describe('requestJsonApiDocument', () => {
+  it('raises an UnexpectedResponseError when a promised document is missing', async () => {
+    server.use(http.post(path, () => new HttpResponse(null, { status: 201 })))
+
+    await expect(
+      requestJsonApiDocument(path, { method: 'POST', schema: exampleSchema }),
     ).rejects.toBeInstanceOf(UnexpectedResponseError)
   })
 })
