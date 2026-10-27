@@ -133,6 +133,8 @@ type TypographyProps = Omit<
   ComponentPropsWithoutRef<'span'>,
   'color' | 'style'
 > & {
+  /** Lets callers move focus to the rendered element, e.g. a heading after a view change. */
+  ref?: Ref<HTMLElement>
   component?: string
   variant?:
     'display' | 'heading' | 'subheading' | 'body' | 'caption' | 'eyebrow'
