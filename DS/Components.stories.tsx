@@ -41,6 +41,10 @@ export const ButtonQuiet: Story = {
   name: 'Button / quiet',
   render: () => <Button variant="quiet">Cancel</Button>,
 }
+export const ButtonPending: Story = {
+  name: 'Button / pending',
+  render: () => <Button isPending>Signing in…</Button>,
+}
 export const ButtonDisabled: Story = {
   name: 'Button / disabled',
   render: () => <Button isDisabled>Unavailable</Button>,
