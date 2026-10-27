@@ -198,8 +198,10 @@ export type TextFieldProps = Omit<
   'className' | 'size' | 'style'
 > & {
   label: ReactNode
+  /** Persistent guidance, kept visible when the field is invalid. */
   helperText?: ReactNode
-  error?: boolean
+  /** Marks the field invalid and is announced with it. */
+  errorMessage?: ReactNode
   fullWidth?: boolean
   inputRef?: Ref<HTMLInputElement>
   className?: string
@@ -208,7 +210,7 @@ export type TextFieldProps = Omit<
 export function TextField({
   label,
   helperText,
-  error = false,
+  errorMessage,
   fullWidth = false,
   inputRef,
   id,
@@ -217,10 +219,11 @@ export function TextField({
   ...props
 }: TextFieldProps) {
   const generatedId = useId()
+  const isInvalid = Boolean(errorMessage)
   return (
     <AriaTextField
       id={id ?? generatedId}
-      isInvalid={error}
+      isInvalid={isInvalid}
       isDisabled={props.disabled}
       className={[styles.textField, fullWidth && styles.fullWidth, className]
         .filter(Boolean)
@@ -233,13 +236,15 @@ export function TextField({
         className={[styles.input, inputClassName].filter(Boolean).join(' ')}
       />
       {Boolean(helperText) && (
-        <Text
-          slot={error ? 'errorMessage' : 'description'}
-          className={styles.description}
-        >
+        <Text slot="description" className={styles.description}>
           {helperText}
         </Text>
       )}
+      {isInvalid ? (
+        <Text slot="errorMessage" className={styles.description}>
+          {errorMessage}
+        </Text>
+      ) : null}
     </AriaTextField>
   )
 }

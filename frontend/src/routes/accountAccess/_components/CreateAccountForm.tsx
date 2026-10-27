@@ -92,9 +92,8 @@ export function CreateAccountForm({
             ) : null}
             <TextField
               autoComplete="email"
-              error={Boolean(emailError)}
+              errorMessage={emailError}
               fullWidth
-              helperText={emailError}
               id="applicant-email"
               inputRef={emailInput}
               label="Email address"
@@ -109,9 +108,9 @@ export function CreateAccountForm({
             />
             <TextField
               autoComplete="new-password"
-              error={Boolean(passwordError)}
+              errorMessage={passwordError}
               fullWidth
-              helperText={passwordError ?? passwordGuidance}
+              helperText={passwordGuidance}
               id="applicant-password"
               inputRef={passwordInput}
               label="Password"

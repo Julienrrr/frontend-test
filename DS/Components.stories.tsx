@@ -62,7 +62,11 @@ export const TextInput: Story = {
 export const TextInputInvalid: Story = {
   name: 'TextField / invalid',
   render: () => (
-    <TextField label="Tax ID" error helperText="Enter a valid tax ID." />
+    <TextField
+      label="Tax ID"
+      helperText="Use the 9-digit number from your tax notice."
+      errorMessage="Enter a valid tax ID."
+    />
   ),
 }
 export const AlertInfo: Story = {
