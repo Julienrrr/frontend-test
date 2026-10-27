@@ -12,14 +12,16 @@ import { useMutation } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 
-import { ApiError, fieldErrorsFrom, NetworkError } from '../../../api/apiErrors'
+import { ApiError, fieldErrorsFrom } from '../../../api/apiErrors'
 import { createApplicantAccount } from '../../../api/applicantAccess'
+import { useRetryAfterLock } from '../_hooks/useRetryAfterLock'
 import {
   normalizeEmail,
   validateRegistration,
   type CredentialErrors,
   type RegistrationValues,
 } from '../_utils/credentialRules'
+import { requestErrorMessage } from '../_utils/requestErrorMessages'
 import { accountAccessHref } from '../_utils/returnTarget'
 
 import styles from './accountAccess.module.css'
@@ -51,7 +53,6 @@ export function CreateAccountForm({
     passwordConfirmation: '',
   })
   const [fieldErrors, setFieldErrors] = useState<RegistrationErrors>({})
-  const [retryLockSeconds, setRetryLockSeconds] = useState<number>()
   const emailInput = useRef<HTMLInputElement>(null)
   const passwordInput = useRef<HTMLInputElement>(null)
   const passwordConfirmationInput = useRef<HTMLInputElement>(null)
@@ -64,24 +65,12 @@ export function CreateAccountForm({
       if (Object.keys(apiFieldErrors).length > 0) {
         showFieldErrors(apiFieldErrors)
       }
-      if (error instanceof ApiError && error.retryAfterSeconds) {
-        setRetryLockSeconds(error.retryAfterSeconds)
-      }
     },
   })
-
-  // Keeps the submit button disabled for the Retry-After delay, then clears the rate-limit message.
-  const { reset: resetRegistration } = registration
-  useEffect(() => {
-    if (retryLockSeconds === undefined) {
-      return undefined
-    }
-    const timer = setTimeout(() => {
-      setRetryLockSeconds(undefined)
-      resetRegistration()
-    }, retryLockSeconds * 1000)
-    return () => clearTimeout(timer)
-  }, [retryLockSeconds, resetRegistration])
+  const isRetryLocked = useRetryAfterLock(
+    registration.error,
+    registration.reset,
+  )
 
   useEffect(() => {
     if (registration.isSuccess) {
@@ -112,7 +101,7 @@ export function CreateAccountForm({
   }
 
   function submit() {
-    if (registration.isPending || retryLockSeconds !== undefined) {
+    if (registration.isPending || isRetryLocked) {
       return
     }
     const errors = validateRegistration(values)
@@ -236,7 +225,7 @@ export function CreateAccountForm({
             <Button
               className={styles.submit}
               fullWidth
-              isDisabled={retryLockSeconds !== undefined}
+              isDisabled={isRetryLocked}
               isPending={registration.isPending}
               size="large"
               type="submit"
@@ -270,30 +259,8 @@ function registrationFieldErrors(error: Error): RegistrationErrors {
 }
 
 function registrationFormError(error: Error | null): string | undefined {
-  if (!error) {
+  if (!error || Object.keys(registrationFieldErrors(error)).length > 0) {
     return undefined
   }
-  if (Object.keys(registrationFieldErrors(error)).length > 0) {
-    return undefined
-  }
-  if (error instanceof ApiError && error.status === 429) {
-    return `Too many attempts. Try again in ${retryDelay(error.retryAfterSeconds)}.`
-  }
-  if (error instanceof NetworkError) {
-    return error.kind === 'timeout'
-      ? 'The server took too long to respond. Please try again.'
-      : "We couldn't reach the server. Check your connection and try again."
-  }
-  return 'Something went wrong. Please try again.'
-}
-
-function retryDelay(seconds: number | undefined): string {
-  if (!seconds) {
-    return 'a few minutes'
-  }
-  if (seconds < 60) {
-    return seconds === 1 ? '1 second' : `${seconds} seconds`
-  }
-  const minutes = Math.ceil(seconds / 60)
-  return minutes === 1 ? '1 minute' : `${minutes} minutes`
+  return requestErrorMessage(error)
 }
