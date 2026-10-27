@@ -11,7 +11,7 @@ import {
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 
-import styles from '../../application-step.module.css'
+import styles from '../_components/applicationStep.module.css'
 
 import type { Route } from './+types/$step'
 

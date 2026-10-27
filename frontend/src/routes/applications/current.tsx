@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router'
 import {
   ApplicantJourneyPresentation,
   type ApplicantJourneyPresentationFixture,
-} from './-applicant-journey-presentation'
+} from './_components/ApplicantJourneyPresentation'
 
 export default function CurrentApplicationJourneyPage() {
   const navigate = useNavigate()

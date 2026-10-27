@@ -1,6 +1,6 @@
 import { Box, Button, Card, CardContent, Stack, Typography } from '@kyc/ui'
 
-import styles from '../applicant-journey.module.css'
+import styles from './applicantJourney.module.css'
 
 export type ApplicantJourneyStep = 'personal-details' | 'identity-and-address'
 export type ApplicantJourneyStepState = 'complete' | 'current' | 'remaining'
