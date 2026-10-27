@@ -22,13 +22,11 @@ import {
   type RegistrationValues,
 } from '../_utils/credentialRules'
 import { requestErrorMessage } from '../_utils/requestErrorMessages'
-import { accountAccessHref } from '../_utils/returnTarget'
 
 import styles from './accountAccess.module.css'
 
 export interface CreateAccountFormProps {
   onNavigate?: (href: string) => void
-  returnTo?: string
 }
 
 type RegistrationField = keyof RegistrationValues
@@ -43,10 +41,7 @@ const fieldOrder: readonly RegistrationField[] = [
 const passwordGuidance =
   'Use at least six characters, including one uppercase letter and one special character.'
 
-export function CreateAccountForm({
-  onNavigate,
-  returnTo,
-}: CreateAccountFormProps) {
+export function CreateAccountForm({ onNavigate }: CreateAccountFormProps) {
   const [values, setValues] = useState<RegistrationValues>({
     email: '',
     password: '',
@@ -102,14 +97,13 @@ export function CreateAccountForm({
     })
   }
 
-  const signInHref = accountAccessHref('/sign-in', returnTo)
   const signInLink = (label: string) => (
     <Link
-      href={signInHref}
+      href="/sign-in"
       onClick={(event) => {
         if (onNavigate) {
           event.preventDefault()
-          onNavigate(signInHref)
+          onNavigate('/sign-in')
         }
       }}
     >

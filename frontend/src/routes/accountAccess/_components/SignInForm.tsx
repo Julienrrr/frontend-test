@@ -21,13 +21,11 @@ import {
   type SignInValues,
 } from '../_utils/credentialRules'
 import { requestErrorMessage } from '../_utils/requestErrorMessages'
-import { accountAccessHref } from '../_utils/returnTarget'
 
 import styles from './accountAccess.module.css'
 
 export interface SignInFormProps {
   onNavigate?: (href: string) => void
-  returnTo?: string
   onSuccess: (href: string) => void
 }
 
@@ -35,11 +33,7 @@ type SignInField = keyof SignInValues
 
 const fieldOrder: readonly SignInField[] = ['email', 'password']
 
-export function SignInForm({
-  onNavigate,
-  returnTo,
-  onSuccess,
-}: SignInFormProps) {
+export function SignInForm({ onNavigate, onSuccess }: SignInFormProps) {
   const [values, setValues] = useState<SignInValues>({
     email: '',
     password: '',
@@ -88,7 +82,6 @@ export function SignInForm({
   }
 
   const formError = signInFormError(signIn.error)
-  const createAccountHref = accountAccessHref('/create-account', returnTo)
 
   return (
     <main className={styles.page}>
@@ -155,11 +148,11 @@ export function SignInForm({
             >
               <span>New to KYC? </span>
               <Link
-                href={createAccountHref}
+                href="/create-account"
                 onClick={(event) => {
                   if (onNavigate) {
                     event.preventDefault()
-                    onNavigate(createAccountHref)
+                    onNavigate('/create-account')
                   }
                 }}
               >
