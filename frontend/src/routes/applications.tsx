@@ -3,6 +3,7 @@ import { Outlet, useRevalidator } from 'react-router'
 
 import { getCurrentApplicantApplication } from '../api/applicantApplications'
 
+import { ApplicantHeader } from './applications/_components/ApplicantHeader'
 import { withApplicantSession } from './applications/_utils/withApplicantSession'
 
 import type { Route } from './+types/applications'
@@ -20,7 +21,12 @@ export function shouldRevalidate() {
 }
 
 export default function ApplicationsLayout() {
-  return <Outlet />
+  return (
+    <>
+      <ApplicantHeader />
+      <Outlet />
+    </>
+  )
 }
 
 export function ErrorBoundary() {

@@ -6,6 +6,7 @@ export default [
   route('api-docs', 'routes/api-docs.tsx'),
   route('create-account', 'routes/createAccount.tsx'),
   route('sign-in', 'routes/signIn.tsx'),
+  route('sign-out', 'routes/signOut.tsx'),
   route('applications', 'routes/applications.tsx', [
     route('current', 'routes/applications/current.tsx'),
     route(

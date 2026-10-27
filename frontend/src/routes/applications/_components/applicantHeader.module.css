@@ -1,0 +1,19 @@
+.header {
+  align-items: center;
+  background: #1976d2;
+  color: #fff;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  min-height: 64px;
+  padding: 0 32px;
+}
+.signOut.signOut {
+  color: #fff;
+}
+
+@media (max-width: 600px) {
+  .header {
+    padding: 0 24px;
+  }
+}
