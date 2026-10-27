@@ -8,9 +8,20 @@ import {
   TextField,
   Typography,
 } from '@kyc/ui'
-import { useEffect, useRef, useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
+import { useState } from 'react'
 
-import { accountAccessHref, isSafeJourneyPath } from '../_utils/returnTarget'
+import { ApiError, fieldErrorsFrom } from '../../../api/apiErrors'
+import { createApplicantSession } from '../../../api/applicantAccess'
+import { useFieldErrors, type FieldErrors } from '../_hooks/useFieldErrors'
+import { useRetryAfterLock } from '../_hooks/useRetryAfterLock'
+import {
+  normalizeEmail,
+  validateSignIn,
+  type SignInValues,
+} from '../_utils/credentialRules'
+import { requestErrorMessage } from '../_utils/requestErrorMessages'
+import { accountAccessHref } from '../_utils/returnTarget'
 
 import styles from './accountAccess.module.css'
 
@@ -20,46 +31,64 @@ export interface SignInFormProps {
   onSuccess: (href: string) => void
 }
 
+type SignInField = keyof SignInValues
+
+const fieldOrder: readonly SignInField[] = ['email', 'password']
+
 export function SignInForm({
   onNavigate,
   returnTo,
   onSuccess,
 }: SignInFormProps) {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState<string>()
-  const [emailError, setEmailError] = useState<string>()
-  const [passwordError, setPasswordError] = useState<string>()
-  const emailInput = useRef<HTMLInputElement>(null)
-  const passwordInput = useRef<HTMLInputElement>(null)
+  const [values, setValues] = useState<SignInValues>({
+    email: '',
+    password: '',
+  })
+  const {
+    fieldErrors,
+    inputRef,
+    showFieldErrors,
+    clearFieldError,
+    clearFieldErrors,
+  } = useFieldErrors(fieldOrder)
 
-  useEffect(() => {
-    if (emailError) {
-      emailInput.current?.focus()
-    } else if (passwordError) {
-      passwordInput.current?.focus()
-    }
-  }, [emailError, passwordError])
-
-  async function submit(): Promise<void> {
-    setError(undefined)
-    setEmailError(undefined)
-    setPasswordError(undefined)
-
-    try {
-      const destination = returnTo ?? '/applications/current'
-      if (!isSafeJourneyPath(destination)) {
-        throw new Error('The destination is invalid.')
+  const signIn = useMutation({
+    mutationFn: createApplicantSession,
+    onSuccess: ({ href }) => onSuccess(href),
+    onError: (error) => {
+      const apiFieldErrors = signInFieldErrors(error)
+      if (Object.keys(apiFieldErrors).length > 0) {
+        showFieldErrors(apiFieldErrors)
+      } else if (isRejectedCredentials(error)) {
+        setValues((current) => ({ ...current, password: '' }))
       }
-      onSuccess(destination)
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : 'Account access could not be completed.',
-      )
-    }
+    },
+  })
+  const isRetryLocked = useRetryAfterLock(signIn.error, signIn.reset)
+
+  function updateField(field: SignInField, value: string) {
+    setValues((current) => ({ ...current, [field]: value }))
+    clearFieldError(field)
   }
+
+  function submit() {
+    if (signIn.isPending || isRetryLocked) {
+      return
+    }
+    const errors = validateSignIn(values)
+    if (Object.keys(errors).length > 0) {
+      showFieldErrors(errors)
+      return
+    }
+    clearFieldErrors()
+    signIn.mutate({
+      email: normalizeEmail(values.email),
+      password: values.password,
+    })
+  }
+
+  const formError = signInFormError(signIn.error)
+  const createAccountHref = accountAccessHref('/create-account', returnTo)
 
   return (
     <main className={styles.page}>
@@ -70,7 +99,7 @@ export function SignInForm({
             className={styles.form}
             onSubmit={(event) => {
               event.preventDefault()
-              void submit()
+              submit()
             }}
             spacing={3}
           >
@@ -82,50 +111,42 @@ export function SignInForm({
                 Sign in to continue your KYC application.
               </Typography>
             </Stack>
-            {(error ?? emailError ?? passwordError) ? (
-              <Alert aria-live="assertive" role="alert" severity="error">
-                {error ?? emailError ?? passwordError}
-              </Alert>
-            ) : null}
+            {formError ? <Alert severity="error">{formError}</Alert> : null}
             <TextField
               autoComplete="email"
-              errorMessage={emailError}
+              errorMessage={fieldErrors.email}
               fullWidth
               id="applicant-email"
-              inputRef={emailInput}
+              inputRef={inputRef('email')}
               label="Email address"
               name="email"
-              onChange={(event) => {
-                setEmail(event.target.value)
-                setEmailError(undefined)
-              }}
+              onChange={(event) => updateField('email', event.target.value)}
               required
               type="email"
-              value={email}
+              value={values.email}
             />
             <TextField
               autoComplete="current-password"
-              errorMessage={passwordError}
+              errorMessage={fieldErrors.password}
               fullWidth
               id="applicant-password"
-              inputRef={passwordInput}
+              inputRef={inputRef('password')}
               label="Password"
               name="password"
-              onChange={(event) => {
-                setPassword(event.target.value)
-                setPasswordError(undefined)
-              }}
+              onChange={(event) => updateField('password', event.target.value)}
               required
               type="password"
-              value={password}
+              value={values.password}
             />
             <Button
               className={styles.submit}
               fullWidth
+              isDisabled={isRetryLocked}
+              isPending={signIn.isPending}
               size="large"
               type="submit"
             >
-              Sign in
+              {signIn.isPending ? 'Signing in…' : 'Sign in'}
             </Button>
             <Typography
               className={styles.footer}
@@ -134,11 +155,11 @@ export function SignInForm({
             >
               <span>New to KYC? </span>
               <Link
-                href={accountAccessHref('/create-account', returnTo)}
+                href={createAccountHref}
                 onClick={(event) => {
                   if (onNavigate) {
                     event.preventDefault()
-                    onNavigate(accountAccessHref('/create-account', returnTo))
+                    onNavigate(createAccountHref)
                   }
                 }}
               >
@@ -150,4 +171,32 @@ export function SignInForm({
       </Card>
     </main>
   )
+}
+
+// Wrong and unusable passwords get the same answer as unknown emails, so the form never says which credential failed.
+function isRejectedCredentials(error: Error): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.hasCode('invalid-credentials') ||
+      (error.status === 400 && 'password' in fieldErrorsFrom(error)))
+  )
+}
+
+// Only a malformed email is shown on its field: it says nothing about any account.
+function signInFieldErrors(error: Error): FieldErrors<SignInField> {
+  if (!(error instanceof ApiError) || error.status !== 400) {
+    return {}
+  }
+  const { email } = fieldErrorsFrom(error)
+  return email ? { email } : {}
+}
+
+function signInFormError(error: Error | null): string | undefined {
+  if (!error || Object.keys(signInFieldErrors(error)).length > 0) {
+    return undefined
+  }
+  if (isRejectedCredentials(error)) {
+    return 'Invalid email or password.'
+  }
+  return requestErrorMessage(error)
 }
