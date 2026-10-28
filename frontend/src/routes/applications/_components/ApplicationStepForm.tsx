@@ -2,6 +2,7 @@ import { Alert, Box, Button, Stack, TextField, Typography } from '@kyc/ui'
 import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 
+import { useFieldErrors } from '../../../_hooks/useFieldErrors'
 import {
   updateApplicantApplicationForm,
   type AnswerField,
@@ -11,7 +12,9 @@ import {
 import {
   applicationStepFields,
   applicationStepTitles,
+  missingStepAnswers,
   stepAnswers,
+  stepFieldOrder,
 } from '../_utils/applicationFormFields'
 
 import styles from './applicationStep.module.css'
@@ -43,6 +46,13 @@ export function ApplicationStepForm({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [saveIntent, setSaveIntent] = useState<'save' | 'continue'>('save')
   const isFirstStep = step === 'personal-details'
+  const {
+    fieldErrors,
+    inputRef,
+    showFieldErrors,
+    clearFieldError,
+    clearFieldErrors,
+  } = useFieldErrors(stepFieldOrder(step))
 
   const save = useMutation({
     mutationFn: () =>
@@ -64,11 +74,21 @@ export function ApplicationStepForm({
   function updateAnswer(field: AnswerField, value: string) {
     setAnswers((current) => ({ ...current, [field]: value }))
     setHasUnsavedChanges(true)
+    clearFieldError(field)
   }
 
   function saveAnswers(intent: 'save' | 'continue') {
     if (save.isPending) {
       return
+    }
+    // Saving a draft accepts gaps; moving on needs the step to be complete.
+    if (intent === 'continue') {
+      const missing = missingStepAnswers(step, answers, consentConfirmed)
+      if (Object.keys(missing).length > 0) {
+        showFieldErrors(missing)
+        return
+      }
+      clearFieldErrors()
     }
     setSaveIntent(intent)
     save.mutate(undefined, {
@@ -105,7 +125,9 @@ export function ApplicationStepForm({
             {applicationStepFields[step].map((field) => (
               <TextField
                 autoComplete={field.autoComplete}
+                errorMessage={fieldErrors[field.name]}
                 helperText={field.helperText}
+                inputRef={inputRef(field.name)}
                 key={field.name}
                 label={`${field.label} (required)`}
                 name={field.name}
@@ -119,21 +141,36 @@ export function ApplicationStepForm({
               />
             ))}
             {isFirstStep ? (
-              <label>
-                <input
-                  checked={consentConfirmed}
-                  name="consentConfirmed"
-                  onChange={(event) => {
-                    if (!save.isPending) {
-                      setConsentConfirmed(event.target.checked)
-                      setHasUnsavedChanges(true)
+              <Stack component="div" spacing={0.5}>
+                <label>
+                  <input
+                    aria-describedby={
+                      fieldErrors.consentConfirmed ? 'consent-error' : undefined
                     }
-                  }}
-                  required
-                  type="checkbox"
-                />{' '}
-                I confirm these details are accurate and belong to me.
-              </label>
+                    aria-invalid={
+                      fieldErrors.consentConfirmed ? true : undefined
+                    }
+                    checked={consentConfirmed}
+                    name="consentConfirmed"
+                    onChange={(event) => {
+                      if (!save.isPending) {
+                        setConsentConfirmed(event.target.checked)
+                        setHasUnsavedChanges(true)
+                        clearFieldError('consentConfirmed')
+                      }
+                    }}
+                    ref={inputRef('consentConfirmed')}
+                    required
+                    type="checkbox"
+                  />{' '}
+                  I confirm these details are accurate and belong to me.
+                </label>
+                {fieldErrors.consentConfirmed ? (
+                  <Typography id="consent-error" className={styles.fieldError}>
+                    {fieldErrors.consentConfirmed}
+                  </Typography>
+                ) : null}
+              </Stack>
             ) : (
               <>
                 <label htmlFor="document-evidence">

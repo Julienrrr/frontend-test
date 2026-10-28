@@ -59,3 +59,31 @@ export function stepAnswers(step: ApplicationStep, saved: Answers): Answers {
     applicationStepFields[step].map(({ name }) => [name, saved[name] ?? '']),
   ) as Answers
 }
+
+export type StepField = AnswerField | 'consentConfirmed'
+
+/** Required-field messages for `step`, in field order; empty when the step can continue. */
+export function missingStepAnswers(
+  step: ApplicationStep,
+  answers: Answers,
+  consentConfirmed: boolean,
+): Partial<Record<StepField, string>> {
+  const errors: Partial<Record<StepField, string>> = {}
+  for (const { name, label } of applicationStepFields[step]) {
+    if (!answers[name]?.trim()) {
+      errors[name] = `${label} is required.`
+    }
+  }
+  if (step === 'personal-details' && !consentConfirmed) {
+    errors.consentConfirmed = 'Confirm that these details are accurate.'
+  }
+  return errors
+}
+
+/** Focus order for the step's fields, the consent checkbox last. */
+export function stepFieldOrder(step: ApplicationStep): StepField[] {
+  const fields: StepField[] = applicationStepFields[step].map(
+    ({ name }) => name,
+  )
+  return step === 'personal-details' ? [...fields, 'consentConfirmed'] : fields
+}

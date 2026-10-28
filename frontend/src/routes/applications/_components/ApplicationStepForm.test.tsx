@@ -3,7 +3,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe, toHaveNoViolations } from 'jest-axe'
 import { delay, http, HttpResponse } from 'msw'
-import { describe, expect, it, vi } from 'vitest'
+import { createRoutesStub, useNavigate } from 'react-router'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { server } from '../../../test/server'
 
@@ -12,6 +13,10 @@ import { ApplicationStepForm } from './ApplicationStepForm'
 import type { ApplicationForm } from '../../../api/applicantApplications'
 
 expect.extend(toHaveNoViolations)
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 const applicationId = '4745524d-345f-4de8-8d52-1291217447ec'
 const formPath = `/api/v1/applicant-applications/${applicationId}/form`
@@ -53,21 +58,46 @@ function errorResponse(status: number, code: string, detail = code) {
   )
 }
 
-function renderForm() {
+const completeAnswers = {
+  name: 'Ada Lovelace',
+  dateOfBirth: '1815-12-10',
+  country: 'United Kingdom',
+  nationality: 'British',
+  email: 'ada@example.com',
+  phone: '+44 20 7946 0958',
+}
+
+function renderForm(form: ApplicationForm = savedForm) {
   const onContinue = vi.fn()
   const onReload = vi.fn()
   const queryClient = new QueryClient({
     defaultOptions: { mutations: { retry: false } },
   })
+  // The unsaved-changes warning needs a data router, as in the app.
+  const Stub = createRoutesStub([
+    {
+      path: '/step',
+      Component: function StepPage() {
+        const navigate = useNavigate()
+        return (
+          <ApplicationStepForm
+            form={form}
+            step="personal-details"
+            onBack={() => void navigate('/elsewhere')}
+            onContinue={() => {
+              onContinue()
+              void navigate('/elsewhere')
+            }}
+            onReload={onReload}
+          />
+        )
+      },
+    },
+    { path: '/elsewhere', Component: () => <h1>Another page</h1> },
+  ])
   const view = render(
     <QueryClientProvider client={queryClient}>
-      <ApplicationStepForm
-        form={savedForm}
-        step="personal-details"
-        onBack={vi.fn()}
-        onContinue={onContinue}
-        onReload={onReload}
-      />
+      <Stub initialEntries={['/step']} />
     </QueryClientProvider>,
   )
   return { user: userEvent.setup(), onContinue, onReload, ...view }
@@ -251,7 +281,11 @@ describe('saving the application step', () => {
       }),
       http.patch(formPath, () => formResponse({ name: 'Ada Lovelace' }, 4)),
     )
-    const { user, onContinue } = renderForm()
+    const { user, onContinue } = renderForm({
+      ...savedForm,
+      answers: completeAnswers,
+      consentConfirmed: true,
+    })
 
     await user.click(screen.getByRole('button', { name: 'Continue' }))
     await screen.findByRole('alert')
@@ -259,5 +293,43 @@ describe('saving the application step', () => {
 
     await user.click(screen.getByRole('button', { name: 'Continue' }))
     await vi.waitFor(() => expect(onContinue).toHaveBeenCalledOnce())
+  })
+
+  it('shows missing answers beside their fields instead of continuing', async () => {
+    const request = vi.fn()
+    server.use(http.patch(formPath, request))
+    const { user, onContinue, container } = renderForm()
+
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+
+    const dateOfBirth = screen.getByLabelText('Date of birth (required)')
+    expect(dateOfBirth).toHaveFocus()
+    expect(dateOfBirth).toHaveAccessibleDescription(
+      /Format: YYYY-MM-DD.*Date of birth is required\./,
+    )
+    expect(screen.getByRole('checkbox')).toHaveAccessibleDescription(
+      'Confirm that these details are accurate.',
+    )
+    expect(screen.getByRole('checkbox')).toBeInvalid()
+    expect(request).not.toHaveBeenCalled()
+    expect(onContinue).not.toHaveBeenCalled()
+    expect(await axe(container)).toHaveNoViolations()
+
+    await user.type(dateOfBirth, '1815-12-10')
+    expect(dateOfBirth).not.toHaveAccessibleDescription(/is required/)
+  })
+
+  it('still saves an incomplete draft with Save', async () => {
+    server.use(
+      http.patch(formPath, () => formResponse({ name: 'Ada Lovelace' }, 4)),
+    )
+    const { user } = renderForm()
+
+    await user.click(saveButton())
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Your answers were saved.',
+    )
+    expect(screen.queryByText(/is required/)).not.toBeInTheDocument()
   })
 })
