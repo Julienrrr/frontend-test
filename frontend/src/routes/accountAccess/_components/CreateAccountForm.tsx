@@ -24,6 +24,7 @@ import {
 } from '../_utils/credentialRules'
 
 import styles from './accountAccess.module.css'
+import { PasswordRequirements } from './PasswordRequirements'
 
 export interface CreateAccountFormProps {
   onNavigate?: (href: string) => void
@@ -37,9 +38,6 @@ const fieldOrder: readonly RegistrationField[] = [
   'password',
   'passwordConfirmation',
 ]
-
-const passwordGuidance =
-  'Use at least six characters, including one uppercase letter and one special character.'
 
 export function CreateAccountForm({ onNavigate }: CreateAccountFormProps) {
   const [values, setValues] = useState<RegistrationValues>({
@@ -177,7 +175,7 @@ export function CreateAccountForm({ onNavigate }: CreateAccountFormProps) {
               autoComplete="new-password"
               errorMessage={fieldErrors.password}
               fullWidth
-              helperText={passwordGuidance}
+              helperText={<PasswordRequirements password={values.password} />}
               id="applicant-password"
               inputRef={inputRef('password')}
               label="Password"

@@ -36,3 +36,15 @@
     padding: 40px;
   }
 }
+
+.requirements {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.requirement {
+  color: #526176;
+}
+.requirementMet {
+  color: #067647;
+}

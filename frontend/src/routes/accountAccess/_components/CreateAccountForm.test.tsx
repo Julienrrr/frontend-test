@@ -82,12 +82,30 @@ describe('CreateAccountForm', () => {
     expect(email).toHaveFocus()
     expect(email).toHaveAccessibleDescription('Enter an email address.')
     expect(screen.getByLabelText('Password')).toHaveAccessibleDescription(
-      /six characters.*Enter a password\./,
+      /At least 6 characters, not met\..*Enter a password\./,
     )
     expect(
       screen.getByLabelText('Confirm password'),
     ).toHaveAccessibleDescription('Confirm your password.')
     expect(request).not.toHaveBeenCalled()
+  })
+
+  it('shows which password rules are met while typing', async () => {
+    const { user } = renderForm()
+    const password = screen.getByLabelText('Password')
+
+    expect(password).toHaveAccessibleDescription(
+      'At least 6 characters, not met. One uppercase letter, not met. One special character, not met.',
+    )
+
+    await user.type(password, 'secret!')
+
+    expect(password).toHaveAccessibleDescription(
+      'At least 6 characters, met. One uppercase letter, not met. One special character, met.',
+    )
+    expect(screen.getByText('One uppercase letter')).not.toHaveClass(
+      /requirementMet/,
+    )
   })
 
   it('clears a field error once the field is edited', async () => {
