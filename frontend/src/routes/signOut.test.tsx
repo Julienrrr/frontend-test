@@ -1,10 +1,11 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe, toHaveNoViolations } from 'jest-axe'
-import { delay, http, HttpResponse } from 'msw'
+import { http, HttpResponse } from 'msw'
 import { createRoutesStub } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 
+import { createGate } from '../test/gate'
 import { server } from '../test/server'
 
 import { ApplicantHeader } from './applications/_components/ApplicantHeader'
@@ -49,10 +50,11 @@ describe('sign out', () => {
 
   it('revokes the session and opens sign-in', async () => {
     const request = vi.fn()
+    const response = createGate()
     server.use(
       http.delete(sessionPath, async () => {
         request()
-        await delay(20)
+        await response.opened
         return new HttpResponse(null, { status: 204 })
       }),
     )
@@ -63,6 +65,7 @@ describe('sign out', () => {
     expect(
       screen.getByRole('button', { name: 'Signing out…' }),
     ).toHaveAttribute('aria-disabled', 'true')
+    response.open()
     expect(
       await screen.findByRole('heading', { name: 'Sign in page' }),
     ).toBeInTheDocument()

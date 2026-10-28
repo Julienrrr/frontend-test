@@ -2,9 +2,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe, toHaveNoViolations } from 'jest-axe'
-import { delay, http, HttpResponse } from 'msw'
+import { http, HttpResponse } from 'msw'
 import { describe, expect, it, vi } from 'vitest'
 
+import { createGate } from '../../../test/gate'
 import { server } from '../../../test/server'
 
 import { SignInForm } from './SignInForm'
@@ -258,10 +259,11 @@ describe('SignInForm', () => {
 
   it('exposes the pending state and sends a single request', async () => {
     const request = vi.fn()
+    const response = createGate()
     server.use(
       http.post(sessionsPath, async () => {
         request()
-        await delay(50)
+        await response.opened
         return sessionResponse('/applications/current')
       }),
     )
@@ -273,6 +275,7 @@ describe('SignInForm', () => {
     expect(submitButton()).toHaveAttribute('aria-disabled', 'true')
     await user.click(submitButton())
     await user.type(screen.getByLabelText('Password'), '{Enter}')
+    response.open()
 
     await vi.waitFor(() => expect(onSuccess).toHaveBeenCalledOnce())
     expect(request).toHaveBeenCalledOnce()

@@ -5,6 +5,7 @@ import { axe, toHaveNoViolations } from 'jest-axe'
 import { delay, http, HttpResponse } from 'msw'
 import { describe, expect, it, vi } from 'vitest'
 
+import { createGate } from '../../../test/gate'
 import { server } from '../../../test/server'
 
 import { CreateAccountForm } from './CreateAccountForm'
@@ -238,10 +239,11 @@ describe('CreateAccountForm', () => {
 
   it('sends a single request while one is pending', async () => {
     const request = vi.fn()
+    const response = createGate()
     server.use(
       http.post(accountsPath, async () => {
         request()
-        await delay(50)
+        await response.opened
         return new HttpResponse(null, { status: 201 })
       }),
     )
@@ -252,6 +254,7 @@ describe('CreateAccountForm', () => {
     expect(submitButton()).toHaveTextContent('Creating account…')
     await user.click(submitButton())
     await user.type(screen.getByLabelText('Confirm password'), '{Enter}')
+    response.open()
 
     await screen.findByRole('heading', { name: 'Account created' })
     expect(request).toHaveBeenCalledOnce()

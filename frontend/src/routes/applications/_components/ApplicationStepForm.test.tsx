@@ -2,10 +2,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { axe, toHaveNoViolations } from 'jest-axe'
-import { delay, http, HttpResponse } from 'msw'
+import { http, HttpResponse } from 'msw'
 import { createRoutesStub, useNavigate } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { createGate } from '../../../test/gate'
 import { server } from '../../../test/server'
 
 import { ApplicationStepForm } from './ApplicationStepForm'
@@ -110,10 +111,11 @@ function saveButton() {
 describe('saving the application step', () => {
   it('saves the step answers with the form version and confirms only after the API does', async () => {
     let body: unknown
+    const response = createGate()
     server.use(
       http.patch(formPath, async ({ request }) => {
         body = await request.json()
-        await delay(30)
+        await response.opened
         return formResponse(
           { name: 'Ada Lovelace', phone: '+44 20', consentConfirmed: true },
           4,
@@ -130,6 +132,7 @@ describe('saving the application step', () => {
     expect(
       screen.queryByText('Your answers were saved.'),
     ).not.toBeInTheDocument()
+    response.open()
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Your answers were saved.',
     )
