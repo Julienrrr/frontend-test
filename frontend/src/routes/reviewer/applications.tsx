@@ -15,7 +15,7 @@ import {
   TextField,
   Typography,
 } from '@kyc/ui'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { z } from 'zod'
 
@@ -435,7 +435,12 @@ export default function ReviewerApplicationsPage({
   const navigate = useNavigate()
   const { q, status, page, response } = loaderData
   const [searchValue, setSearchValue] = useState(q)
-  useEffect(() => setSearchValue(q), [q])
+  // Follow URL changes such as Back or cleared filters, without an extra render from an effect.
+  const [searchFromUrl, setSearchFromUrl] = useState(q)
+  if (q !== searchFromUrl) {
+    setSearchFromUrl(q)
+    setSearchValue(q)
+  }
   const updateSearch = (next: {
     q?: string
     status?: ReviewerApplicationStatus
