@@ -332,4 +332,42 @@ describe('saving the application step', () => {
     )
     expect(screen.queryByText(/is required/)).not.toBeInTheDocument()
   })
+
+  it('asks before leaving with unsaved changes and stays when the applicant declines', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const { user } = renderForm()
+
+    await user.type(screen.getByLabelText('Country (required)'), 'UK')
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+
+    expect(confirm).toHaveBeenCalledWith(
+      'You have unsaved changes. Leave this page without saving them?',
+    )
+    expect(screen.getByLabelText('Country (required)')).toHaveValue('UK')
+
+    confirm.mockReturnValue(true)
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(
+      await screen.findByRole('heading', { name: 'Another page' }),
+    ).toBeInTheDocument()
+  })
+
+  it('leaves without asking once the answers are saved', async () => {
+    const confirm = vi.spyOn(window, 'confirm')
+    server.use(http.patch(formPath, () => formResponse(completeAnswers, 4)))
+    const { user } = renderForm({
+      ...savedForm,
+      answers: completeAnswers,
+      consentConfirmed: true,
+    })
+
+    await user.clear(screen.getByLabelText('Phone (required)'))
+    await user.type(screen.getByLabelText('Phone (required)'), '+44 20')
+    await user.click(screen.getByRole('button', { name: 'Continue' }))
+
+    expect(
+      await screen.findByRole('heading', { name: 'Another page' }),
+    ).toBeInTheDocument()
+    expect(confirm).not.toHaveBeenCalled()
+  })
 })

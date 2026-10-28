@@ -9,6 +9,7 @@ import {
   type ApplicationForm,
   type ApplicationStep,
 } from '../../../api/applicantApplications'
+import { useUnsavedChangesWarning } from '../_hooks/useUnsavedChangesWarning'
 import {
   applicationStepFields,
   applicationStepTitles,
@@ -43,7 +44,7 @@ export function ApplicationStepForm({
     form.consentConfirmed,
   )
   const [version, setVersion] = useState(form.version)
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const { hasUnsavedChanges, setHasUnsavedChanges } = useUnsavedChangesWarning()
   const [saveIntent, setSaveIntent] = useState<'save' | 'continue'>('save')
   const isFirstStep = step === 'personal-details'
   const {
