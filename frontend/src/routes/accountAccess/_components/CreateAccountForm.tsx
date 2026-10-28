@@ -11,10 +11,10 @@ import {
 import { useMutation } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 
+import { useFieldErrors } from '../../../_hooks/useFieldErrors'
 import { requestErrorMessage } from '../../../_utils/requestErrorMessages'
 import { ApiError, fieldErrorsFrom } from '../../../api/apiErrors'
 import { createApplicantAccount } from '../../../api/applicantAccess'
-import { useFieldErrors } from '../_hooks/useFieldErrors'
 import { useRetryAfterLock } from '../_hooks/useRetryAfterLock'
 import {
   normalizeEmail,
